@@ -108,7 +108,7 @@ func encode(obj meta.Object) (n yml.Node, err error) {
 	n.Kind = yml.MappingNode
 
 	// Sort the keys so the output order is predictable, making testing easier.
-	var keys []string
+	keys := make([]string, 0, len(obj.Map))
 	for key := range obj.Map {
 		keys = append(keys, key)
 	}
