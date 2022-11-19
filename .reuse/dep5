@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: goschtalt
+Upstream-Contact: Weston Schmidt <weston_scmidt@alumni.purdue.edu>
+Source: https://github.com/goschtalt/yaml-encoder
+
+Files: CODE_OF_CONDUCT.md
+Copyright: SPDX-FileCopyrightText: 2014-2021 Coraline Ada Ehmke and contributors
+License: CC-BY-4.0
+
+Files: .golangci.yml go.mod go.sum MAINTAINERS.md
+Copyright: SPDX-FileCopyrightText: 2022 Weston Schmidt <weston_schmidt@alumni.purdue.edu>
+License: Apache-2.0
