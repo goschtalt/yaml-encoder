@@ -1,4 +1,4 @@
-module github.com/goschtalt/yaml-encoder/yamlencoder
+module github.com/goschtalt/yaml-encoder
 
 go 1.18
 

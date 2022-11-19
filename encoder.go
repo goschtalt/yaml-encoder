@@ -3,7 +3,7 @@
 
 // yaml provides a way to encode both the simple form and the detailed form
 // of configuration data for the goschtalt library.
-package yamlencoder
+package yaml
 
 import (
 	"errors"
