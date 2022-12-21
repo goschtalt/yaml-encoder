@@ -1,13 +1,38 @@
 // SPDX-FileCopyrightText: 2022 Weston Schmidt <weston_schmidt@alumni.purdue.edu>
 // SPDX-License-Identifier: Apache-2.0
 
-// yaml provides a way to encode both the simple form and the detailed form
+// yamlencoder provides a way to encode both the simple form and the detailed form
 // of configuration data for the goschtalt library.
-package yaml
+//
+// # Detailed Output
+//
+// The details about where the configuration value originated are included as
+// a list of `file:line[col]` values in a comment if goschtalt knows the origin.
+// Not all decoders support tracking all this information.  Comment will always
+// be present so it's easier to handle the file using simple cli text processors.
+//
+// Example
+//
+//	candy: bar                      # file.yml:1[8]
+//	cats:                           # file.yml:2[1]
+//	    - madd                      # file.yml:3[7]
+//	    - tabby                     # file.yml:4[7]
+//	other:                          # file.yml:5[1]
+//	    things:                     # file.yml:6[5]
+//	        green:                  # file.yml:8[9]
+//	            - grass             # unknown
+//	            - ground            # file.yml:10[15]
+//	        red: balloons           # file.yml:7[14]
+//	    trending: now               # file.yml:12[15]
+package yamlencoder
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/base32"
 	"errors"
 	"sort"
+	"strings"
 
 	"github.com/goschtalt/goschtalt"
 	"github.com/goschtalt/goschtalt/pkg/encoder"
@@ -60,7 +85,12 @@ func (e Encoder) EncodeExtended(obj meta.Object) ([]byte, error) {
 	}
 	doc.Content = append(doc.Content, &n)
 
-	return yml.Marshal(&doc)
+	b, err := yml.Marshal(&doc)
+	if err != nil {
+		return nil, err
+	}
+
+	return alignComments(b)
 }
 
 // encoderWrapper handles the fact that the yaml decoder may panic instead of
@@ -77,8 +107,10 @@ func encoderWrapper(n *yml.Node, v any) (err error) {
 
 // encode is an internal helper function that builds the yml.Node based tree
 // to give to the yaml encoder.  This is likely specific to this yaml encoder.
+// Also always be sure to include a comment on each line so the alignment process
+// in alignComments() is simpler logic.
 func encode(obj meta.Object) (n yml.Node, err error) {
-	n.LineComment = obj.OriginString()
+	n.LineComment = encodeComment(obj.OriginString())
 	kind := obj.Kind()
 
 	if kind == meta.Value {
@@ -87,7 +119,7 @@ func encode(obj meta.Object) (n yml.Node, err error) {
 		if err != nil {
 			return yml.Node{}, err
 		}
-		n.LineComment = obj.OriginString() // The encode wipes this out.
+		n.LineComment = encodeComment(obj.OriginString()) // The encode wipes this out.
 		return n, nil
 	}
 
@@ -118,7 +150,7 @@ func encode(obj meta.Object) (n yml.Node, err error) {
 		v := obj.Map[k]
 		key := yml.Node{
 			Kind:        yml.ScalarNode,
-			LineComment: v.OriginString(),
+			LineComment: encodeComment(v.OriginString()),
 			Value:       k,
 		}
 		val, err := encode(v)
@@ -131,4 +163,74 @@ func encode(obj meta.Object) (n yml.Node, err error) {
 	}
 
 	return n, nil
+}
+
+// encodeComment base32 encodes the comment so the processing needed to align
+// the comments is easier.  We can simply look for the right-most # because of
+// the encoding excluding # from the character set.
+func encodeComment(s string) string {
+	if len(s) == 0 {
+		s = "unknown"
+	}
+	return base32.StdEncoding.EncodeToString([]byte(s))
+}
+
+// decodeComment is the reverse of encodeComment(), but handles the case of if
+// decoding fails.  It should never fail, but it checks for it anyway.
+func decodeComment(s string) (string, error) {
+	buf, err := base32.StdEncoding.DecodeString(s)
+	if err != nil {
+		return "", err
+	}
+
+	return string(buf), nil
+}
+
+// alignComments finds the longest line, adds 8 spaces, then aligns the comments
+// to the next tabstop (assuming tabwidth is 4).  This is also where the comments
+// are decoded from base32.
+func alignComments(buf []byte) ([]byte, error) {
+	// Assume each line is about 24 bytes long as a starting buffer size.
+	// A smaller line size guess reduces the re-allocations needed later.
+	lines := make([]string, 0, len(buf)/24)
+	scanner := bufio.NewScanner(bytes.NewReader(buf))
+
+	var widest int
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if found := strings.LastIndex(line, "# "); found > widest {
+			widest = found
+		}
+
+		lines = append(lines, line)
+	}
+
+	widest += 8 + (widest % 4)
+
+	var b strings.Builder
+	for _, line := range lines {
+		if found := strings.LastIndex(line, "# "); found > 0 {
+			left := line[:found]
+			right := line[found:]
+			comment, err := decodeComment(right[2:])
+			if err != nil {
+				// This  isn't really possible unless our the encoder below
+				// changes.  This seems better than either a silent failure
+				// or a panic.
+				return nil, err
+			}
+
+			b.WriteString(left)
+			for found < widest {
+				b.WriteString(" ")
+				found++
+			}
+			b.WriteString("# ")
+			b.WriteString(comment)
+			b.WriteString("\n")
+		}
+	}
+
+	return []byte(b.String()), nil
 }

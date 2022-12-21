@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 Weston Schmidt <weston_schmidt@alumni.purdue.edu>
 // SPDX-License-Identifier: Apache-2.0
 
-package yaml
+package yamlencoder
 
 import (
 	"testing"
@@ -82,8 +82,9 @@ func TestEncodeExtended(t *testing.T) {
 										Origins: []meta.Origin{{File: "file.yml", Line: 8, Col: 9}},
 										Array: []meta.Object{
 											{
-												Origins: []meta.Origin{{File: "file.yml", Line: 9, Col: 15}},
-												Value:   "grass",
+												// Leave the origin off here to show what happens if none
+												// is present.
+												Value: "grass",
 											},
 											{
 												Origins: []meta.Origin{{File: "file.yml", Line: 10, Col: 15}},
@@ -118,18 +119,18 @@ other:
         red: balloons
     trending: now
 `,
-			expectedExtended: `candy: bar # file.yml:1[8]
-cats: # file.yml:2[1]
-    - madd # file.yml:3[7]
-    - tabby # file.yml:4[7]
-other: # file.yml:5[1]
-    things: # file.yml:6[5]
-        green: # file.yml:8[9]
-            - grass # file.yml:9[15]
-            - ground # file.yml:10[15]
-            - water # file.yml:11[15]
-        red: balloons # file.yml:7[14]
-    trending: now # file.yml:12[15]
+			expectedExtended: `candy: bar                      # file.yml:1[8]
+cats:                           # file.yml:2[1]
+    - madd                      # file.yml:3[7]
+    - tabby                     # file.yml:4[7]
+other:                          # file.yml:5[1]
+    things:                     # file.yml:6[5]
+        green:                  # file.yml:8[9]
+            - grass             # unknown
+            - ground            # file.yml:10[15]
+            - water             # file.yml:11[15]
+        red: balloons           # file.yml:7[14]
+    trending: now               # file.yml:12[15]
 `,
 		},
 		{
@@ -230,4 +231,12 @@ other: # file.yml:5[1]
 			assert.Nil(got)
 		})
 	}
+}
+
+func TestDecodeComment(t *testing.T) {
+	assert := assert.New(t)
+
+	s, err := decodeComment("#")
+	assert.Equal("", s)
+	assert.Error(err)
 }
