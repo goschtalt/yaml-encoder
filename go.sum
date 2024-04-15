@@ -3,8 +3,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/goschtalt/goschtalt v0.24.1 h1:+9UkHxuRmRI3G850kwGF03GQRk3j0JzAaxNzdkrJsVw=
-github.com/goschtalt/goschtalt v0.24.1/go.mod h1:VeN+P4rFr9WbdB6uBJR+N5WBU7aFLU+fzoEMiO/6/C4=
+github.com/goschtalt/goschtalt v0.25.0 h1:xf/VhUr8ieHbRG6uf2J4LGqTjdThVTWRJT/4OSCAxiU=
+github.com/goschtalt/goschtalt v0.25.0/go.mod h1:VeN+P4rFr9WbdB6uBJR+N5WBU7aFLU+fzoEMiO/6/C4=
 github.com/kr/pretty v0.3.0 h1:WgNl7dwNpEZ6jJ9k1snq4pZsg7DOEN8hP9Xw0Tsjwk0=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
