@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/goschtalt/goschtalt/pkg/meta"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 func TestExtensions(t *testing.T) {
@@ -46,7 +47,7 @@ func TestEncodeExtended(t *testing.T) {
 			//        green:
 			//            - grass
 			//            - ground
-			//            - water
+			//            - "water/nballoons\""
 			//    trending: now
 			in: meta.Object{
 				Origins: []meta.Origin{{File: "file.yml", Line: 1, Col: 1}},
@@ -88,11 +89,11 @@ func TestEncodeExtended(t *testing.T) {
 											},
 											{
 												Origins: []meta.Origin{{File: "file.yml", Line: 10, Col: 15}},
-												Value:   "ground",
+												Value:   "ground\nout",
 											},
 											{
 												Origins: []meta.Origin{{File: "file.yml", Line: 11, Col: 15}},
-												Value:   "water",
+												Value:   "water\nballoons\"",
 											},
 										},
 									},
@@ -114,23 +115,27 @@ other:
     things:
         green:
             - grass
-            - ground
-            - water
+            - |-
+              ground
+              out
+            - |-
+              water
+              balloons"
         red: balloons
     trending: now
 `,
-			expectedExtended: `candy: bar                      # file.yml:1[8]
-cats:                           # file.yml:2[1]
-    - madd                      # file.yml:3[7]
-    - tabby                     # file.yml:4[7]
-other:                          # file.yml:5[1]
-    things:                     # file.yml:6[5]
-        green:                  # file.yml:8[9]
-            - grass             # unknown
-            - ground            # file.yml:10[15]
-            - water             # file.yml:11[15]
-        red: balloons           # file.yml:7[14]
-    trending: now               # file.yml:12[15]
+			expectedExtended: `candy: bar                                  # file.yml:1[8]
+cats:                                       # file.yml:2[1]
+    - madd                                  # file.yml:3[7]
+    - tabby                                 # file.yml:4[7]
+other:                                      # file.yml:5[1]
+    things:                                 # file.yml:6[5]
+        green:                              # file.yml:8[9]
+            - grass                         # unknown
+            - "ground\nout"                 # file.yml:10[15]
+            - "water\nballoons\""           # file.yml:11[15]
+        red: balloons                       # file.yml:7[14]
+    trending: now                           # file.yml:12[15]
 `,
 		},
 		{
@@ -217,13 +222,17 @@ other:                          # file.yml:5[1]
 
 			if tc.expectedErr == nil {
 				assert.NoError(err)
-				assert.Empty(cmp.Diff(tc.expectedExtended, string(got)))
+				assert.Empty(cmp.Diff(tc.expectedExtended, string(got)), "EncodeExtended(obj) failed")
+				if cmp.Diff(tc.expectedExtended, string(got)) != "" {
+					t.Logf("expected:\n%s", tc.expectedExtended)
+					t.Logf("got:\n%s", string(got))
+				}
 
 				raw := tc.in.ToRaw()
 
 				got, err = e.Encode(raw)
 				assert.NoError(err)
-				assert.Empty(cmp.Diff(tc.expected, string(got)))
+				assert.Empty(cmp.Diff(tc.expected, string(got)), "Encode(raw) failed")
 				return
 			}
 
@@ -239,4 +248,33 @@ func TestDecodeComment(t *testing.T) {
 	s, err := decodeComment("#")
 	assert.Equal("", s)
 	assert.Error(err)
+}
+
+func TestDetermineStyle(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected yaml.Style
+	}{
+		{"simple", yaml.TaggedStyle},
+		{"multi\nline", yaml.DoubleQuotedStyle},
+		{"noleadingColon:", yaml.TaggedStyle},
+		{":leadingColon", yaml.DoubleQuotedStyle},
+		{"-leadingDash", yaml.DoubleQuotedStyle},
+		{"noleading-Dash", yaml.TaggedStyle},
+		{"contains\\backslash", yaml.DoubleQuotedStyle},
+		{"contains\"quote", yaml.DoubleQuotedStyle},
+		{"contains\bbackspace", yaml.DoubleQuotedStyle},
+		{"unicode\u0080", yaml.DoubleQuotedStyle},
+		{"", yaml.DoubleQuotedStyle},
+		{"endsWithSpace ", yaml.DoubleQuotedStyle},
+	}
+
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			result := determineStyle(test.input)
+			if result != test.expected {
+				t.Errorf("determineStyle(%q) = %v; want %v", test.input, result, test.expected)
+			}
+		})
+	}
 }
