@@ -33,6 +33,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/goschtalt/goschtalt"
 	"github.com/goschtalt/goschtalt/pkg/encoder"
@@ -93,6 +94,52 @@ func (e Encoder) EncodeExtended(obj meta.Object) ([]byte, error) {
 	return alignComments(b)
 }
 
+// determineStyle determines the best YAML style (|- or quoted) for a given string.
+func determineStyle(input string) yml.Style {
+	// Check flags to decide whether we need to quote the string
+	needsQuotes := false
+	containsNewlines := false
+
+	for idx, ch := range input {
+		switch {
+		case ch == '\n':
+			// Newlines are fine in a block scalar
+			containsNewlines = true
+		case ch < 0x20 && ch != '\t': // Non-printable ASCII except tab
+			needsQuotes = true
+		case (ch == ':' || ch == '-') && idx == 0:
+			// Leading `:` or `-` must be quoted
+			needsQuotes = true
+		case ch == '\\':
+			// Backslash must be quoted to preserve literal value
+			needsQuotes = true
+		case ch == '"':
+			// Double quotes must be escaped if quoted
+			needsQuotes = true
+		case ch > 0x7F:
+			// Unicode characters above ASCII 127
+			needsQuotes = true
+		}
+	}
+
+	// If the string contains newlines and doesn't need quotes, use |-
+	if containsNewlines && !needsQuotes {
+		// return yml.LiteralStyle <-- This is ideal, but there is a bug
+		// in the yaml encoder that causes it to encode the output wrong that
+		// I can't figure out how to work around.  So we'll use the next best
+		// thing.
+		return yml.DoubleQuotedStyle
+	}
+
+	// If the string needs quotes or is empty or ends with a space, use ""
+	if needsQuotes || len(input) == 0 || unicode.IsSpace(rune(input[len(input)-1])) {
+		return yml.DoubleQuotedStyle
+	}
+
+	// Default to plain style
+	return yml.TaggedStyle
+}
+
 // encoderWrapper handles the fact that the yaml decoder may panic instead of
 // returning an error.
 func encoderWrapper(n *yml.Node, v any) (err error) {
@@ -101,6 +148,15 @@ func encoderWrapper(n *yml.Node, v any) (err error) {
 			err = ErrEncoding
 		}
 	}()
+
+	// This is to work around a bug in the yaml encoder where encodes the output
+	// wrong if the string contains a newline.
+	if s, ok := v.(string); ok {
+		n.Style = determineStyle(s)
+		n.Kind = yml.ScalarNode
+		n.Value = s
+		return nil
+	}
 
 	return n.Encode(v)
 }
@@ -215,7 +271,7 @@ func alignComments(buf []byte) ([]byte, error) {
 			right := line[found:]
 			comment, err := decodeComment(right[2:])
 			if err != nil {
-				// This  isn't really possible unless our the encoder below
+				// This  isn't really possible unless the encoder below
 				// changes.  This seems better than either a silent failure
 				// or a panic.
 				return nil, err
